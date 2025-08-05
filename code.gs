@@ -1,11 +1,3 @@
-function checkLinksSkeleton() {
-  const ss = SpreadsheetApp.getActive();
-
-  // 1) Lấy URL đích ở sheet "Kết quả", ô A2
-  const targetSheet = ss.getSheetByName('Kết quả');
-  const targetUrl   = targetSheet.getRange('A2').getValue().trim();
-
-}
 
 function getAllSourceUrls() {
   const ss = SpreadsheetApp.getActive();
