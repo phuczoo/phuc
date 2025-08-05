@@ -1,10 +1,10 @@
-
 function getAllSourceUrls() {
   const ss = SpreadsheetApp.getActive();
   const sourceSheet = ss.getSheetByName('Nguồn');
   const rawList = sourceSheet.getRange('A2:A' + sourceSheet.getLastRow())
                              .getValues()
                              .flat()
+                             .map(u => u.trim())
                              .filter(u => u);
 
   let sourceUrls = [];
@@ -22,6 +22,7 @@ function getAllSourceUrls() {
   // Chỉ /blog…
   const blogPattern = /^https:\/\/fastcare\.vn\/blog(\/|$)/i;
   sourceUrls = sourceUrls.filter(u => blogPattern.test(u));
+  sourceUrls = [...new Set(sourceUrls)];
 
   return sourceUrls;
 }
@@ -63,6 +64,10 @@ function scanPagesInBatch(urls, targetUrl) {
     urls.map(u => ({ url: u, muteHttpExceptions: true }))
   );
   return responses.map((resp, idx) => {
+    if (resp.getResponseCode() !== 200) {
+      Logger.log(`Bỏ qua ${urls[idx]} với mã HTTP ${resp.getResponseCode()}`);
+      return { url: urls[idx], anchors: [] };
+    }
     const html = resp.getContentText()
       .replace(/<nav[\s\S]*?<\/nav>|<div[^>]*role=["']dialog["'][\s\S]*?<\/div>/gi,'');
     const anchors = extractAnchors(html, targetUrl);
