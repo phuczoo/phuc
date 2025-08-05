@@ -31,27 +31,20 @@ function getAllSourceUrls() {
  * Đệ quy: cho vào URL sitemap (có thể là sitemap-index),
  * trả về mảng URL bài viết (.html, .htm, v.v.).
  */
-function getUrlsFromSitemap(u) {
-  const xml   = UrlFetchApp.fetch(u, {muteHttpExceptions:true}).getContentText();
-  const doc   = XmlService.parse(xml);
-  const root  = doc.getRootElement();
-  const ns    = root.getNamespace();           // 👈 lấy namespace
-  const name  = root.getName();
-
-  if (name === 'urlset') {
-    return root.getChildren('url', ns)          // 👈 truyền ns
-               .map(n => n.getChild('loc', ns).getText())
-               .filter(x => !x.endsWith('.xml'));
-  }
-
-  if (name === 'sitemapindex') {
-    const subs = root.getChildren('sitemap', ns)
-                     .map(n => n.getChild('loc', ns).getText());
-    let all = [];
-    subs.forEach(s => all = all.concat(getUrlsFromSitemap(s)));
-    return all;
-  }
-  return [];
+function scanPagesInBatch(urls, targetUrl) {
+  const responses = UrlFetchApp.fetchAll(
+    urls.map(u => ({ url: u, muteHttpExceptions: true }))
+  );
+  return responses.map((resp, idx) => {
+    if (resp.getResponseCode() !== 200) {
+      Logger.log(`Bỏ qua ${urls[idx]} với mã HTTP ${resp.getResponseCode()}`);
+      return { url: urls[idx], anchors: [] };
+    }
+    const html = resp.getContentText()
+      .replace(/<nav[\s\S]*?<\/nav>|<div[^>]*role=["']dialog["'][\s\S]*?<\/div>/gi,'');
+    const anchors = extractAnchors(html, targetUrl);
+    return { url: urls[idx], anchors };
+  });
 }
 
 /**
@@ -101,6 +94,7 @@ function writeResults() {
   const sourceUrls = getAllSourceUrls();
   const resultSheet = ss.getSheetByName('Kết quả');
   resultSheet.getRange('C4:D' + resultSheet.getLastRow()).clearContent();
+  let startRow = 4;
 
   const batchSize = 200;
   const writeThreshold = 1000; // Ghi khi tích lũy được 1000 hàng
@@ -113,6 +107,8 @@ function writeResults() {
 
     if (rows.length >= writeThreshold || i === sourceUrls.length - 1) {
       resultSheet.getRange(resultSheet.getLastRow() + 1, 3, rows.length, 2).setValues(rows);
+      resultSheet.getRange(startRow, 3, rows.length, 2).setValues(rows);
+      startRow += rows.length;
       rows.length = 0;
       Utilities.sleep(1000);
     }
